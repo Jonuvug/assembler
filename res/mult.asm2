@@ -9,7 +9,7 @@ top:
 	JC,  continue
 
 	LDA, $0052
-	OUT
+	PRT
 	HLT
 
 continue:

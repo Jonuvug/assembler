@@ -15,25 +15,17 @@ constexpr auto RES_PATH = "../../../res/";
 namespace assembler
 {
 
-	/*enum class OperationType
+	enum class LabelType
 	{
-		xADDRESS,
-		xLITERAL,
-		xIO
+		LA_ADDRESS,
+		LA_LITERAL,
 	};
-
-	std::unordered_map<OperationType, std::vector<std::vector<tokenizer::TokenType>>> OperationTokenTemplate
+	
+	struct Label
 	{
-		{OperationType::xADDRESS, {
-			{tokenizer::TokenType::TK_SYMBOL, tokenizer::TokenType::TK_COMMA, tokenizer::TokenType::TK_SYMBOL},
-			{tokenizer::TokenType::TK_SYMBOL, tokenizer::TokenType::TK_COMMA, tokenizer::TokenType::TK_DOLLAR, tokenizer::TokenType::TK_ADDRESS}}
-		},
-
-		{OperationType::xLITERAL, {
-			{tokenizer::TokenType::TK_SYMBOL, tokenizer::TokenType::TK_COMMA, tokenizer::TokenType::TK_SYMBOL},
-			{tokenizer::TokenType::TK_SYMBOL, tokenizer::TokenType::TK_COMMA, tokenizer::TokenType::TK_DOLLAR, tokenizer::TokenType::TK_ADDRESS}}
-		}
-	};*/
+		tokenizer::Token symbol;
+		int lcValue;
+	};
 
 	struct Operation
 	{
@@ -44,20 +36,32 @@ namespace assembler
 
 	std::unordered_map<std::string, Operation> OpCodeTable =
 	{
-		{"LDA", {"LDA", 0x10, 3}}
+		{"HLT", {"HLT", 0x00, 1}},
+		{"LDA", {"LDA", 0x10, 3}},
+		{"LDI", {"LDI", 0x11, 2}},
+		{"ADD", {"ADD", 0x20, 3}},
+		{"ADI", {"ADI", 0x21, 2}},
+		{"SUB", {"SUB", 0x25, 3}},
+		{"SUI", {"SUI", 0x26, 2}},
+		{"STA", {"STA", 0x40, 3}},
+		{"JMP", {"JMP", 0x50, 3}},
+		{"JC",  {"JC",  0x51, 3}},
+		{"JZ",  {"JZ",  0x52, 3}},
+		{"PRT", {"PRT", 0xE0, 1}},
+		{"NOP", {"NOP", 0xFF, 1}},
 	};
 
 
 	enum class RecordType
 	{
-		DEF_VAR_ADDRESS,
-		DEF_VAR_LITERAL,
-		DEF_LABEL,
+		RT_DEF_ADDRESS,
+		RT_DEF_LITERAL,
+		RT_DEF_LABEL,
 
-		INS_ADDRESS,
-		INS_LITERAL,
-		INS_LABEL,
-		INS_NONE
+		RT_INS_ADDRESS,
+		RT_INS_LITERAL,
+		RT_INS_LABEL,
+		RT_INS_NONE
 	};
 
 	struct Record
@@ -68,7 +72,15 @@ namespace assembler
 		std::vector<tokenizer::Token> tokenGroup;
 	};
 
-	utils::Error findRecordType(std::vector<tokenizer::Token>& tokenGroup, assembler::RecordType& recordType)
+
+	struct Intermediate
+	{
+		std::vector<Record> intermediate;
+		std::vector<Label> symbolTable;
+
+	};
+
+	void findRecordType(std::vector<tokenizer::Token>& tokenGroup, assembler::RecordType& recordType)
 	{
 		
 		// variable definition
@@ -77,29 +89,29 @@ namespace assembler
 			// define address variable
 			if (tokenGroup[3].type == tokenizer::TokenType::TK_ADDRESS)
 			{
-				recordType = RecordType::DEF_VAR_ADDRESS;
-				return { utils::ErrorType::ER_SUCCESS, 0 };
+				recordType = RecordType::RT_DEF_ADDRESS;
+				return;
 			}
 			// define literal variable
 			if (tokenGroup[3].type == tokenizer::TokenType::TK_LITERAL)
 			{
-				recordType = RecordType::DEF_VAR_LITERAL;
-				return { utils::ErrorType::ER_SUCCESS, 0 };
+				recordType = RecordType::RT_DEF_LITERAL;
+				return;
 			}
 		}
 		
 		// define label
 		if (tokenGroup[1].type == tokenizer::TokenType::TK_COLON)
 		{
-			recordType = RecordType::DEF_LABEL;
-			return { utils::ErrorType::ER_SUCCESS, 0 };
+			recordType = RecordType::RT_DEF_LABEL;
+			return;
 		}
 
 		// instruction no operand
 		if (tokenGroup[1].type == tokenizer::TokenType::TK_NEWLINE)
 		{
-			recordType = RecordType::INS_NONE;
-			return { utils::ErrorType::ER_SUCCESS, 0 };
+			recordType = RecordType::RT_INS_NONE;
+			return;
 		}
 
 		// instruction with operand
@@ -109,58 +121,75 @@ namespace assembler
 			// label as operand
 			if (tokenGroup[2].type == tokenizer::TokenType::TK_SYMBOL)
 			{
-				recordType = RecordType::INS_LABEL;
-				return { utils::ErrorType::ER_SUCCESS, 0 };
+				recordType = RecordType::RT_INS_LABEL;
+				return;
 			}
 			// address as operand
 			if (tokenGroup[3].type == tokenizer::TokenType::TK_ADDRESS)
 			{
-				recordType = RecordType::INS_ADDRESS;
-				return { utils::ErrorType::ER_SUCCESS, 0 };
+				recordType = RecordType::RT_INS_ADDRESS;
+				return;
 			}
 			// literal as operand
 			if (tokenGroup[3].type == tokenizer::TokenType::TK_LITERAL)
 			{
-				recordType = RecordType::INS_LITERAL;
-				return { utils::ErrorType::ER_SUCCESS, 0};
+				recordType = RecordType::RT_INS_LITERAL;
+				return;
 			}
 		}
 
-		return { utils::ErrorType::ER_INVALID_TOKEN_ORDER, tokenGroup[0].line };
+		utils::Error( utils::ErrorType::ER_INVALID_TOKEN_ORDER, tokenGroup[0].line );
 	}
 
-	utils::Error assemble(std::vector<std::vector<tokenizer::Token>>& tokens, std::vector<Record>& intermediate)
+	void appendLabel(std::vector<Label>& symbolTable, tokenizer::Token symbol, int locationCounter)
+	{
+
+		for (auto& label : symbolTable)
+		{
+			if (label.symbol == symbol)
+			{
+				utils::Error(utils::ErrorType::ER_MULTIPLY_DEFINED_LABELS, symbol.line);
+
+			}
+		}
+		symbolTable.push_back({ symbol, locationCounter });
+	}
+
+	void firstPass(std::vector<std::vector<tokenizer::Token>>& tokens, Intermediate& intermediate)
 	{
 		std::vector<Record> records;
+		int locationCounter = 0;
+
 		for (auto& tokenGroup : tokens)
 		{
 			RecordType recordType;
-			findRecordType(tokenGroup, recordType).assert();
+			findRecordType(tokenGroup, recordType);
+			
+			int lineLocationSize = 0;
 
 			switch (recordType)
 			{
-			case RecordType::DEF_VAR_ADDRESS:
-
+			case RecordType::RT_DEF_ADDRESS:
+				lineLocationSize = 4;
 				break;
-			case RecordType::DEF_VAR_LITERAL:
+			case RecordType::RT_DEF_LITERAL:
+				lineLocationSize = 2;
 				break;
-			case RecordType::DEF_LABEL:
-
+			case RecordType::RT_DEF_LABEL:
+				appendLabel(intermediate.symbolTable, tokenGroup[0], locationCounter);
 				break;
-			case RecordType::INS_ADDRESS:
-				break;
-			case RecordType::INS_LITERAL:
-				break;
-			case RecordType::INS_LABEL:
-				break;
-			case RecordType::INS_NONE:
-				break;
-			default:
+			case RecordType::RT_INS_ADDRESS:
+			case RecordType::RT_INS_LITERAL:
+			case RecordType::RT_INS_LABEL:
+			case RecordType::RT_INS_NONE:
+				lineLocationSize = OpCodeTable[tokenGroup[0].value].wordSize;
 				break;
 			}
+
+			locationCounter += lineLocationSize;
 		}
 
-		return { utils::ErrorType::ER_SUCCESS, 0 };
+
 	}
 
 	void load(const std::string& filename, std::string& out)
@@ -171,8 +200,8 @@ namespace assembler
 
 		if (!file.is_open())
 		{
-			std::cerr << "unable to open file" << std::endl;
 			out = stream.str();
+			utils::Error( utils::ErrorType::ER_LOADING_FILE, 0 );
 			return;
 		}
 

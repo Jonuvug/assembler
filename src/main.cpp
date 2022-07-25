@@ -9,13 +9,13 @@
 int main()
 {
 	std::string raw;
-	std::vector<assembler::Record> intermediate;
+	assembler::Intermediate intermediate;
 	std::vector <std::vector<tokenizer::Token>>tokens;
 
 	assembler::load("mult.asm2", raw);
-	tokenizer::tokenize_dev(raw, tokens);
+	tokenizer::tokenize(raw, tokens);
 
-	assembler::assemble(tokens, intermediate);
+	assembler::firstPass(tokens, intermediate);
 
 	return 0;
 }
