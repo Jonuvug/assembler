@@ -56,7 +56,7 @@ namespace utils
 			{
 				std::cout << "Error  E" << ErrorInfoMap[type].errorCode << "  " << ErrorInfoMap[type].errorMessage << "  ( line : " << line << " )\n";
 				//exit(ErrorInfoMap[type].errorCode);
-				exit(0);
+				exit(-1);
 			}
 		}
 

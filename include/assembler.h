@@ -66,7 +66,7 @@ namespace assembler
 
 	struct Record
 	{
-		assembler::RecordType type;
+		RecordType type;
 		int locationCounter;
 		Operation operation;
 		std::vector<tokenizer::Token> tokenGroup;
@@ -75,7 +75,7 @@ namespace assembler
 
 	struct Intermediate
 	{
-		std::vector<Record> intermediate;
+		std::vector<Record> records;
 		std::vector<Label> symbolTable;
 
 	};
@@ -149,7 +149,6 @@ namespace assembler
 			if (label.symbol == symbol)
 			{
 				utils::Error(utils::ErrorType::ER_MULTIPLY_DEFINED_LABELS, symbol.line);
-
 			}
 		}
 		symbolTable.push_back({ symbol, locationCounter });
@@ -162,18 +161,22 @@ namespace assembler
 
 		for (auto& tokenGroup : tokens)
 		{
+			Record record;
 			RecordType recordType;
+			unsigned int opCode = 0xFF;
+			unsigned int currentOperationSize = 0;
+			std::string mnemonic;
+
 			findRecordType(tokenGroup, recordType);
-			
-			int lineLocationSize = 0;
+
 
 			switch (recordType)
 			{
 			case RecordType::RT_DEF_ADDRESS:
-				lineLocationSize = 4;
+				currentOperationSize = 4;
 				break;
 			case RecordType::RT_DEF_LITERAL:
-				lineLocationSize = 2;
+				currentOperationSize = 2;
 				break;
 			case RecordType::RT_DEF_LABEL:
 				appendLabel(intermediate.symbolTable, tokenGroup[0], locationCounter);
@@ -182,13 +185,24 @@ namespace assembler
 			case RecordType::RT_INS_LITERAL:
 			case RecordType::RT_INS_LABEL:
 			case RecordType::RT_INS_NONE:
-				lineLocationSize = OpCodeTable[tokenGroup[0].value].wordSize;
+				Operation operation = OpCodeTable[tokenGroup[0].value];
+				currentOperationSize = operation.wordSize;
+				opCode = operation.opcode;
+				mnemonic = operation.mnemonic;
 				break;
 			}
 
-			locationCounter += lineLocationSize;
+			locationCounter += currentOperationSize;
+			Operation op = { mnemonic, opCode, currentOperationSize };
+			records.push_back({ recordType, locationCounter, op, tokenGroup });
 		}
 
+
+
+	}
+
+	void secondPass()
+	{
 
 	}
 
