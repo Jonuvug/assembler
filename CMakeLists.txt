@@ -12,7 +12,7 @@ message("-- Compiler version : " ${CMAKE_CXX_COMPILER_VERSION} " | Compiler id :
 # Add source to this project's executable.
 add_executable (assembler
 	src/main.cpp
- "include/utils.h")
+)
  
 # Point to include directory
 target_include_directories(assembler PUBLIC

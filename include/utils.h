@@ -16,7 +16,9 @@ namespace utils
 
 		ER_LOADING_FILE,
 
-		ER_MULTIPLY_DEFINED_LABELS
+		ER_MULTIPLY_DEFINED_LABELS,
+		ER_INVALID_OPERAND,
+		ER_UNRECOGNIZED_OPERATION
 	};
 
 #pragma warning( push )
@@ -40,7 +42,9 @@ namespace utils
 
 		{ ErrorType::ER_LOADING_FILE,				{200,	"\"unable to load file\"",			true} },
 
-		{ ErrorType::ER_MULTIPLY_DEFINED_LABELS,	{301,	"\"multiply defined labels\"",		true} }
+		{ ErrorType::ER_MULTIPLY_DEFINED_LABELS,	{301,	"\"multiply defined labels\"",		true} },
+		{ ErrorType::ER_INVALID_OPERAND,			{302,	"\"invalid operand type\"",			true} },
+		{ ErrorType::ER_UNRECOGNIZED_OPERATION,		{303,	"\"unrecognized operation found\"",	true} }
 	};
 
 	struct Error
@@ -60,7 +64,7 @@ namespace utils
 			}
 		}
 
-		Error(ErrorType _type, int _line) : Error(_type, ErrorInfoMap[type].fatal, _line)
+		Error(ErrorType _type, int _line) : Error(_type, ErrorInfoMap[_type].fatal, _line)
 		{ }
 	};
 }
