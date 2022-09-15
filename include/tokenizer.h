@@ -1,13 +1,15 @@
 #pragma once
 
-
 #include <iostream>
 #include <string>
 #include <vector>
 #include <algorithm>
 #include <map>
+#include <fstream>
 
 #include "utils.h"
+
+const std::string TOKEN_PATH = "tokens.tkz";
 
 namespace tokenizer
 {
@@ -22,92 +24,212 @@ namespace tokenizer
 		TK_EQUAL,
 		TK_COLON,
 		TK_COMMA,
-		TK_NEWLINE,
+		TK_NEWLINE
 	};
 
 	struct Token
 	{
 		TokenType type;
 		std::string value;
-		int line;
 
 		bool operator == (Token const& other)
 		{
-			return value == other.value;
+			return value == other.value && type == other.type;
+		}
+		bool operator != (Token const& other)
+		{
+			return !(*this==other);
+		}
+
+		friend std::ofstream& operator << (std::ofstream& os, const Token& tk)
+		{
+			switch (tk.type)
+			{
+			case TokenType::TK_SYMBOL:
+				os << '!';
+				os << tk.value;
+				os << '|';
+				break;
+			case TokenType::TK_ADDRESS:
+				os << tk.value;
+				os << '|';
+				break;
+			case TokenType::TK_LITERAL:
+				os << tk.value;
+				os << '|';
+				break;
+			case TokenType::TK_PERCENT:
+				os << '%';
+				break;
+			case TokenType::TK_DOLLAR:
+				os << '$';
+				break;
+			case TokenType::TK_EQUAL:
+				os << '=';
+				break;
+			case TokenType::TK_COLON:
+				os << ':';
+				break;
+			case TokenType::TK_COMMA:
+				os << ',';
+				break;
+			}
+
+			return os;
 		}
 	};
 
-	void printTokens(std::vector<std::vector<Token>>& tokens)
+	struct TokenGroup
 	{
-		std::string out;
-		for (auto& tokenGroup : tokens)
+		std::vector<Token> tokens;
+		int line;
+
+		bool operator == (TokenGroup const& other)
 		{
-			for (auto& token : tokenGroup)
+			if (tokens.size() != other.tokens.size())
 			{
-				
-				out = token.value;
-				if (token.type == TokenType::TK_SYMBOL)
-					out = "SYMBOL(" + token.value + ") @ line " + std::to_string(token.line);
-				if (token.type == TokenType::TK_LITERAL)
-					out = "LITERAL(" + token.value + ") @ line " + std::to_string(token.line);
-				if (token.type == TokenType::TK_ADDRESS)
-					out = "ADDRESS(" + token.value + ") @ line " + std::to_string(token.line);
-				out += '\n';
+				return false;
 			}
-		}
-		std::cout << out << "\n";
-	}
-
-	void validateTokens(std::vector<std::vector<Token>>& tokens)
-	{
-		std::vector <TokenType> excpectedTokens = { TokenType::TK_SYMBOL, TokenType::TK_NEWLINE };
-
-		for (auto& tokenGroup : tokens)
-		{
-			for (auto& token : tokenGroup)
+			for (int i = 0; i < tokens.size(); i++)
 			{
-				if (std::find(excpectedTokens.begin(), excpectedTokens.end(), token.type) == excpectedTokens.end())
+				if (tokens[i] != other.tokens[i])
 				{
-					utils::Error( utils::ErrorType::ER_UNEXPECTED_TOKEN, token.line );
+					return false;
 				}
+			}
+			return true;
+		}
 
-				switch (token.type)
+		bool operator != (TokenGroup const& other)
+		{
+			return !(*this == other);
+		}
+
+		friend std::ofstream& operator << (std::ofstream& os, const TokenGroup& tg)
+		{
+			for (auto& token : tg.tokens)
+			{
+				os << token;
+			}
+			os << '/';
+			os << tg.line;
+			os << '\n';
+
+			return os;
+		}
+
+		friend std::ifstream& operator >> (std::ifstream& is, TokenGroup& tg)
+		{
+			std::vector<Token> tokens;
+			int line = 0;
+
+			char c;
+			TokenType type = TokenType::TK_SYMBOL;
+			std::string value;
+			std::string symbol;
+			bool eol = false;
+
+			while (!eol && !is.eof() && is >> c)
+			{
+				switch (c)
 				{
-				case TokenType::TK_SYMBOL:
-					excpectedTokens = { TokenType::TK_EQUAL, TokenType::TK_COLON, TokenType::TK_COMMA, TokenType::TK_NEWLINE };
+				case '%':
+					// literal
+					type = TokenType::TK_LITERAL;
+					tokens.push_back({ TokenType::TK_PERCENT, "PERCENT(%)" });
 					break;
-				case TokenType::TK_LITERAL:
-					excpectedTokens = { TokenType::TK_COMMA, TokenType::TK_NEWLINE };
+				case '$':
+					// address
+					type = TokenType::TK_ADDRESS;
+					tokens.push_back({ TokenType::TK_DOLLAR, "DOLLAR($)" });
 					break;
-				case TokenType::TK_ADDRESS:
-					excpectedTokens = { TokenType::TK_COMMA, TokenType::TK_NEWLINE };
+				case '=':
+					tokens.push_back({ TokenType::TK_EQUAL, "EQUAL(=)" });
 					break;
-				case TokenType::TK_EQUAL:
-					excpectedTokens = { TokenType::TK_DOLLAR, TokenType::TK_PERCENT };
+				case ':':
+					tokens.push_back({ TokenType::TK_COLON, "COLON(:)" });
 					break;
-				case TokenType::TK_PERCENT:
-					excpectedTokens = { TokenType::TK_LITERAL };
+				case ',':
+					tokens.push_back({ TokenType::TK_COMMA, "COMMA(,)" });
 					break;
-				case TokenType::TK_DOLLAR:
-					excpectedTokens = { TokenType::TK_ADDRESS };
+
+				case '|':
+					// eof symbol
+					tokens.push_back({ type, symbol });
+					symbol.clear();
 					break;
-				case TokenType::TK_COLON:
-					excpectedTokens = { TokenType::TK_NEWLINE };
+				case '!':
+					// symbol
+					type = TokenType::TK_SYMBOL;
 					break;
-				case TokenType::TK_COMMA:
-					excpectedTokens = { TokenType::TK_PERCENT, TokenType::TK_DOLLAR, TokenType::TK_SYMBOL };
-					break;
-				case TokenType::TK_NEWLINE:
-					excpectedTokens = { TokenType::TK_SYMBOL, TokenType::TK_NEWLINE };
+
+				case '/':
+					// end of line
+					eol = true;
+
+					//get line number
+					value.clear();
+					while (is.get(c) && c != '\n')
+					{
+						value.push_back(c);
+					}
+					line = stoi(value);
+
+					tokens.push_back({ TokenType::TK_NEWLINE, "NEWLINE(\\n)" });
 					break;
 				default:
-					utils::Error( utils::ErrorType::ER_UNRECOGNIZED_TOKEN, token.line );
+					symbol.push_back(c);
+					break;
 				}
+			}
+			tg = { tokens, line };
+
+			return is;
+		}
+	};
+
+	void validateTokens(TokenGroup& tokenGroup)
+	{
+
+		std::vector <TokenType> excpectedTokens = { TokenType::TK_SYMBOL, TokenType::TK_NEWLINE };
+
+		for (auto& token : tokenGroup.tokens)
+		{
+			if (std::find(excpectedTokens.begin(), excpectedTokens.end(), token.type) == excpectedTokens.end())
+			{
+				utils::Error(utils::ErrorType::ER_UNEXPECTED_TOKEN, tokenGroup.line);
+			}
+			switch (token.type)
+			{
+			case TokenType::TK_SYMBOL:
+				excpectedTokens = { TokenType::TK_EQUAL, TokenType::TK_COLON, TokenType::TK_COMMA, TokenType::TK_NEWLINE };
+				break;
+			case TokenType::TK_LITERAL:
+				excpectedTokens = { TokenType::TK_COMMA, TokenType::TK_NEWLINE };
+				break;
+			case TokenType::TK_ADDRESS:
+				excpectedTokens = { TokenType::TK_COMMA, TokenType::TK_NEWLINE };
+				break;
+			case TokenType::TK_EQUAL:
+				excpectedTokens = { TokenType::TK_DOLLAR, TokenType::TK_PERCENT };
+				break;
+			case TokenType::TK_PERCENT:
+				excpectedTokens = { TokenType::TK_LITERAL };
+				break;
+			case TokenType::TK_DOLLAR:
+				excpectedTokens = { TokenType::TK_ADDRESS };
+				break;
+			case TokenType::TK_COLON:
+				excpectedTokens = { TokenType::TK_NEWLINE };
+				break;
+			case TokenType::TK_COMMA:
+				excpectedTokens = { TokenType::TK_PERCENT, TokenType::TK_DOLLAR, TokenType::TK_SYMBOL };
+				break;
 			}
 		}
 	}
 
-	void validateString(std::string& currentString, TokenType& previousTokenType, TokenType& stringType, int currentLine)
+	void identifySymbol(std::string& currentString, TokenType& previousTokenType, TokenType& stringType, int currentLine)
 	{
 		switch (previousTokenType)
 		{
@@ -121,7 +243,7 @@ namespace tokenizer
 			utils::Error( utils::ErrorType::ER_UNRECOGNIZED_NUM, currentLine );
 			break;
 		case TokenType::TK_PERCENT:
-			// is hex & of length 4
+			// is hex & of length 2
 			if (currentString.find_first_not_of("0123456789abcdefABCDEF") == std::string::npos && currentString.length() == 2)
 			{
 				stringType = TokenType::TK_LITERAL;
@@ -135,32 +257,59 @@ namespace tokenizer
 		}
 	}
 
-	void appendToken(std::vector<Token>& tokenGroup, TokenType type, std::string& currentString, TokenType& previousTokenType, int currentLine, std::string value)
+	void appendToken(TokenGroup& tokenGroup, TokenType type, std::string& currentSymbol, TokenType& previousTokenType, int currentLine, std::string value)
 	{
-		if (!currentString.empty())
+		if (!currentSymbol.empty())
 		{
-			TokenType stringType;
-			validateString(currentString, previousTokenType, stringType, currentLine);
-			tokenGroup.push_back({ stringType, currentString, currentLine });
+			TokenType symbolType;
+
+			identifySymbol(currentSymbol, previousTokenType, symbolType, currentLine);
+
+			tokenGroup.tokens.push_back({ symbolType, currentSymbol });
 		}
 
-		currentString.clear();
+		currentSymbol.clear();
 		previousTokenType = type;
 
-		tokenGroup.push_back({ type, value, currentLine });
+		tokenGroup.tokens.push_back({ type, value });
 	}
 
-	void tokenize(const std::string& rawData, std::vector<std::vector<Token>>& tokens)
+	void writeLine(std::ofstream& tokenFile, TokenGroup& tokenGroup, int& currentLine)
 	{
+		tokenGroup.line = currentLine;
+
+		// skip newlines
+		if (tokenGroup.tokens.size() > 1)
+		{
+			// validate and write onto tokenfile
+			validateTokens(tokenGroup);
+			tokenFile << tokenGroup;
+		}
+
+		currentLine++;
+		tokenGroup.tokens.clear();
+	}
+
+	void tokenize(const std::string filename)
+	{
+		// load file
+		std::ifstream rawFile(utils::RES_PATH + filename);
+		if (!rawFile.is_open())
+		{
+			utils::Error(utils::ErrorType::ER_LOADING_FILE, 0);
+			return;
+		}
+
 		int currentLine = 1;
-
 		std::string currentString = "";
-
 		TokenType previousTokenType = TokenType::TK_SYMBOL;
+		TokenGroup tokenGroup;
 
-		std::vector<Token> tokenGroup;
+		//open intermediary file
+		std::ofstream tokenFile(utils::RES_PATH + TOKEN_PATH);
 
-		for (auto& c : rawData)
+		char c;
+		while(rawFile.get(c))
 		{
 			switch (c)
 			{
@@ -190,14 +339,8 @@ namespace tokenizer
 
 			case '\n':
 				appendToken(tokenGroup, TokenType::TK_NEWLINE, currentString, previousTokenType, currentLine, "NEWLINE(\\n)");
-				currentLine++;
-				// not only newline
-				if (tokenGroup.size() > 1)
-				{
-					tokens.push_back(tokenGroup);
-				}
-				tokenGroup.clear();
-
+				
+				writeLine(tokenFile, tokenGroup, currentLine);
 				break;
 
 			case 'a':
@@ -276,7 +419,10 @@ namespace tokenizer
 				break;
 			}
 		}
+		appendToken(tokenGroup, TokenType::TK_NEWLINE, currentString, previousTokenType, currentLine, "NEWLINE(\\n)");
 
-		validateTokens(tokens);
+		writeLine(tokenFile, tokenGroup, currentLine);
+
+		tokenFile.close();
 	}
 }

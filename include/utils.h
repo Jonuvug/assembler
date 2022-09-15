@@ -2,14 +2,16 @@
 
 #include <unordered_map>
 
+
 namespace utils
 {
+	const std::string RES_PATH = "../../../res/";
+
 	enum class ErrorType
 	{
 		ER_SUCCESS,
 
 		ER_UNEXPECTED_TOKEN,
-		ER_UNRECOGNIZED_TOKEN,
 		ER_UNRECOGNIZED_CHAR,
 		ER_UNRECOGNIZED_NUM,
 		ER_INVALID_TOKEN_ORDER,
@@ -35,10 +37,9 @@ namespace utils
 	{
 
 		{ ErrorType::ER_UNEXPECTED_TOKEN,			{100,	"\"unexpected token found\"",		true} },
-		{ ErrorType::ER_UNRECOGNIZED_TOKEN,			{101,	"\"unrecognized token found\"",		true} },
-		{ ErrorType::ER_UNRECOGNIZED_CHAR,			{102,	"\"unrecognized character found\"",	true} },
-		{ ErrorType::ER_UNRECOGNIZED_NUM,			{103,	"\"unrecognized numerical found\"",	true} },
-		{ ErrorType::ER_INVALID_TOKEN_ORDER,		{104,	"\"invalid token order\"",			true} },
+		{ ErrorType::ER_UNRECOGNIZED_CHAR,			{101,	"\"unrecognized character found\"",	true} },
+		{ ErrorType::ER_UNRECOGNIZED_NUM,			{102,	"\"unrecognized numerical found\"",	true} },
+		{ ErrorType::ER_INVALID_TOKEN_ORDER,		{103,	"\"invalid token order\"",			true} },
 
 		{ ErrorType::ER_LOADING_FILE,				{200,	"\"unable to load file\"",			true} },
 

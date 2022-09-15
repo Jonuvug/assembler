@@ -13,7 +13,6 @@ init:
 	LDI, %00
 	STA, product
 
-
 top:
 	LDA, x_val
 	SUB, one
@@ -29,3 +28,6 @@ continue:
 	ADD, y_val
 	STA, product
 	JMP, top
+
+
+
