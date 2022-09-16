@@ -8,7 +8,7 @@ init:
 	STA, one
 	LDI, %16
 	STA, x_val
-	LDI, %06
+	LDI, %09
 	STA, y_val
 	LDI, %00
 	STA, product

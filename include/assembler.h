@@ -1,13 +1,10 @@
 #pragma once
-#pragma warning( disable : 26495 )
 
-#include <tokenizer.h>
-#include <iostream>
 #include <fstream>
-#include <sstream>
 #include <unordered_map>
 
 #include "utils.h"
+#include "tokenizer.h"
 
 namespace assembler
 {
