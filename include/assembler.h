@@ -189,13 +189,6 @@ namespace assembler
 		}
 	};
 
-
-	struct Intermediate
-	{
-		std::vector<Record> records;
-		std::vector<Label> symbolTable;
-	};
-
 	void findRecordType(tokenizer::TokenGroup& tokenGroup, assembler::RecordType& recordType)
 	{
 		// variable definition
@@ -228,25 +221,22 @@ namespace assembler
 			recordType = RecordType::RT_INS_NONE;
 			return;
 		}
-
-		// instruction with operand
-		if (tokenGroup.tokens[1].type == tokenizer::TokenType::TK_COMMA)
+		else // instruction with operand
 		{
-			
 			// label as operand
-			if (tokenGroup.tokens[2].type == tokenizer::TokenType::TK_SYMBOL)
+			if (tokenGroup.tokens[1].type == tokenizer::TokenType::TK_SYMBOL)
 			{
 				recordType = RecordType::RT_INS_LABEL;
 				return;
 			}
 			// address as operand
-			if (tokenGroup.tokens[3].type == tokenizer::TokenType::TK_ADDRESS)
+			if (tokenGroup.tokens[2].type == tokenizer::TokenType::TK_ADDRESS)
 			{
 				recordType = RecordType::RT_INS_ADDRESS;
 				return;
 			}
 			// literal as operand
-			if (tokenGroup.tokens[3].type == tokenizer::TokenType::TK_LITERAL)
+			if (tokenGroup.tokens[2].type == tokenizer::TokenType::TK_LITERAL)
 			{
 				recordType = RecordType::RT_INS_LITERAL;
 				return;
@@ -329,55 +319,6 @@ namespace assembler
 		tokenFile.close();
 	}
 
-	int stringHexToDecimal(std::string string)
-	{
-		int value = 0;
-		int pos = 0;
-		for each (char c in string)
-		{
-			int num;
-			switch (c)
-			{
-			case '0':
-				num = 0;
-				break;
-			case '1':
-				num = 1;
-				break;
-			case '2':
-				num = 2;
-				break;
-			case '3':
-				num = 3;
-				break;
-			case '4':
-				num = 4;
-				break;
-			case '5':
-				num = 5;
-				break;
-			case '6':
-				num = 6;
-				break;
-			case '7':
-				num = 7;
-				break;
-			case '8':
-				num = 8;
-				break;
-			case '9':
-				num = 9;
-				break;
-			default:
-				num = 0;
-				break;
-			}
-			value += num * static_cast<int>(pow(16, pos));
-			pos++;
-		}
-		return value;
-	}
-
 	void findLabel(std::ifstream& symbolTable, std::string symbol, Label& label, int line)
 	{
 		// reset stream pointer
@@ -421,7 +362,7 @@ namespace assembler
 			unsigned char upperByte;
 
 			//get address
-			address = record.tokenGroup.tokens[3].value;;
+			address = record.tokenGroup.tokens[2].value;;
 
 			//get address value in hex
 			lowerByte = stoi(address.substr(0, 2), nullptr, 16);
@@ -440,7 +381,7 @@ namespace assembler
 			unsigned char literal;
 
 			//get address
-			address = record.tokenGroup.tokens[3].value;;
+			address = record.tokenGroup.tokens[2].value;;
 
 			//get address value in hex
 			literal = stoi(address.substr(0, 2), nullptr, 16);
@@ -456,7 +397,7 @@ namespace assembler
 		case RecordType::RT_INS_LABEL:
 			Label label;
 
-			findLabel(symbolTable, record.tokenGroup.tokens[2].value, label, record.tokenGroup.line);
+			findLabel(symbolTable, record.tokenGroup.tokens[1].value, label, record.tokenGroup.line);
 
 			validateOperands(operation.operandType, label.labelType, record.tokenGroup.line);
 
@@ -511,3 +452,4 @@ namespace assembler
 
 	}
 }
+

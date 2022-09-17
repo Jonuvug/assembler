@@ -79,6 +79,18 @@ namespace tokenizer
 		}
 	};
 
+	enum class TokenGroupType
+	{
+		RT_DEF_ADDRESS,
+		RT_DEF_LITERAL,
+		RT_DEF_LABEL,
+
+		RT_INS_O1_A,
+		RT_INS_O1_L,
+		RT_INS_O1_S,
+		RT_INS
+	};
+
 	struct TokenGroup
 	{
 		std::vector<Token> tokens;
@@ -188,87 +200,48 @@ namespace tokenizer
 		}
 	};
 
-	void validateTokens(TokenGroup& tokenGroup)
+	void appendSymbol(TokenGroup& tokenGroup, std::string& currentSymbol, TokenType& previousTokenType, int currentLine)
 	{
-
-		std::vector <TokenType> excpectedTokens = { TokenType::TK_SYMBOL, TokenType::TK_NEWLINE };
-
-		for (auto& token : tokenGroup.tokens)
+		if (currentSymbol.empty())
 		{
-			if (std::find(excpectedTokens.begin(), excpectedTokens.end(), token.type) == excpectedTokens.end())
-			{
-				utils::Error(utils::ErrorType::ER_UNEXPECTED_TOKEN, tokenGroup.line);
-			}
-			switch (token.type)
-			{
-			case TokenType::TK_SYMBOL:
-				excpectedTokens = { TokenType::TK_EQUAL, TokenType::TK_COLON, TokenType::TK_COMMA, TokenType::TK_NEWLINE };
-				break;
-			case TokenType::TK_LITERAL:
-				excpectedTokens = { TokenType::TK_COMMA, TokenType::TK_NEWLINE };
-				break;
-			case TokenType::TK_ADDRESS:
-				excpectedTokens = { TokenType::TK_COMMA, TokenType::TK_NEWLINE };
-				break;
-			case TokenType::TK_EQUAL:
-				excpectedTokens = { TokenType::TK_DOLLAR, TokenType::TK_PERCENT };
-				break;
-			case TokenType::TK_PERCENT:
-				excpectedTokens = { TokenType::TK_LITERAL };
-				break;
-			case TokenType::TK_DOLLAR:
-				excpectedTokens = { TokenType::TK_ADDRESS };
-				break;
-			case TokenType::TK_COLON:
-				excpectedTokens = { TokenType::TK_NEWLINE };
-				break;
-			case TokenType::TK_COMMA:
-				excpectedTokens = { TokenType::TK_PERCENT, TokenType::TK_DOLLAR, TokenType::TK_SYMBOL };
-				break;
-			}
+			return;
 		}
-	}
 
-	void identifySymbol(std::string& currentString, TokenType& previousTokenType, TokenType& stringType, int currentLine)
-	{
+		//identify symbol type and verify numericals
+		TokenType symbolType;
 		switch (previousTokenType)
 		{
 		case TokenType::TK_DOLLAR:
 			// is hex & of length 4
-			if (currentString.find_first_not_of("0123456789abcdefABCDEF") == std::string::npos && currentString.length() == 4)
+			if (currentSymbol.find_first_not_of("0123456789abcdefABCDEF") == std::string::npos && currentSymbol.length() == 4)
 			{
-				stringType = TokenType::TK_ADDRESS;
+				symbolType = TokenType::TK_ADDRESS;
 				break;
 			}
-			utils::Error( utils::ErrorType::ER_UNRECOGNIZED_NUM, currentLine );
+			utils::Error(utils::ErrorType::ER_UNRECOGNIZED_NUM, currentLine);
 			break;
 		case TokenType::TK_PERCENT:
 			// is hex & of length 2
-			if (currentString.find_first_not_of("0123456789abcdefABCDEF") == std::string::npos && currentString.length() == 2)
+			if (currentSymbol.find_first_not_of("0123456789abcdefABCDEF") == std::string::npos && currentSymbol.length() == 2)
 			{
-				stringType = TokenType::TK_LITERAL;
+				symbolType = TokenType::TK_LITERAL;
 				break;
 			}
-			utils::Error( utils::ErrorType::ER_UNRECOGNIZED_NUM, currentLine );
+			utils::Error(utils::ErrorType::ER_UNRECOGNIZED_NUM, currentLine);
 			break;
 		default:
-			stringType = TokenType::TK_SYMBOL;
+			symbolType = TokenType::TK_SYMBOL;
 			break;
 		}
+
+		tokenGroup.tokens.push_back({ symbolType, currentSymbol });
+		currentSymbol.clear();
 	}
 
 	void appendToken(TokenGroup& tokenGroup, TokenType type, std::string& currentSymbol, TokenType& previousTokenType, int currentLine, std::string value)
 	{
-		if (!currentSymbol.empty())
-		{
-			TokenType symbolType;
+		appendSymbol(tokenGroup, currentSymbol, previousTokenType, currentLine);
 
-			identifySymbol(currentSymbol, previousTokenType, symbolType, currentLine);
-
-			tokenGroup.tokens.push_back({ symbolType, currentSymbol });
-		}
-
-		currentSymbol.clear();
 		previousTokenType = type;
 
 		tokenGroup.tokens.push_back({ type, value });
@@ -281,8 +254,45 @@ namespace tokenizer
 		// skip newlines
 		if (tokenGroup.tokens.size() > 1)
 		{
-			// validate and write onto tokenfile
-			validateTokens(tokenGroup);
+			// validate tokens
+			std::vector <TokenType> excpectedTokens = { TokenType::TK_SYMBOL, TokenType::TK_NEWLINE };
+
+			for (auto& token : tokenGroup.tokens)
+			{
+				if (std::find(excpectedTokens.begin(), excpectedTokens.end(), token.type) == excpectedTokens.end())
+				{
+					utils::Error(utils::ErrorType::ER_UNEXPECTED_TOKEN, tokenGroup.line);
+				}
+				switch (token.type)
+				{
+				case TokenType::TK_SYMBOL:
+					excpectedTokens = { TokenType::TK_EQUAL, TokenType::TK_COLON, TokenType::TK_PERCENT, TokenType::TK_DOLLAR, TokenType::TK_SYMBOL, TokenType::TK_COMMA, TokenType::TK_NEWLINE };
+					break;
+				case TokenType::TK_LITERAL:
+					excpectedTokens = { TokenType::TK_COMMA, TokenType::TK_NEWLINE };
+					break;
+				case TokenType::TK_ADDRESS:
+					excpectedTokens = { TokenType::TK_COMMA, TokenType::TK_NEWLINE };
+					break;
+				case TokenType::TK_EQUAL:
+					excpectedTokens = { TokenType::TK_DOLLAR, TokenType::TK_PERCENT };
+					break;
+				case TokenType::TK_PERCENT:
+					excpectedTokens = { TokenType::TK_LITERAL };
+					break;
+				case TokenType::TK_DOLLAR:
+					excpectedTokens = { TokenType::TK_ADDRESS };
+					break;
+				case TokenType::TK_COLON:
+					excpectedTokens = { TokenType::TK_NEWLINE };
+					break;
+				case TokenType::TK_COMMA:
+					excpectedTokens = { TokenType::TK_PERCENT, TokenType::TK_DOLLAR, TokenType::TK_SYMBOL };
+					break;
+				}
+			}
+
+			// write
 			tokenFile << tokenGroup;
 		}
 
@@ -313,10 +323,13 @@ namespace tokenizer
 		{
 			switch (c)
 			{
-			case ' ':
+			
 			case '\t':
 				break;
 
+			case ' ':
+				appendSymbol(tokenGroup, currentString, previousTokenType, currentLine);
+				break;
 			case '%':
 				appendToken(tokenGroup, TokenType::TK_PERCENT, currentString, previousTokenType, currentLine, "PERCENT(%)");
 				break;

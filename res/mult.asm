@@ -4,30 +4,30 @@ y_val	=	$0052
 product	=	$0053
 
 init:
-	LDI, %01
-	STA, one
-	LDI, %16
-	STA, x_val
-	LDI, %09
-	STA, y_val
-	LDI, %00
-	STA, product
+	LDI %01
+	STA one
+	LDI %16
+	STA x_val
+	LDI %09
+	STA y_val
+	LDI %00
+	STA product
 
 top:
-	LDA, x_val
-	SUB, one
-	JC, continue
+	LDA x_val
+	SUB one
+	JC continue
 
-	LDA, product
+	LDA product
 	PRT
 	HLT
 
 continue:
-	STA, x_val
-	LDA, product
-	ADD, y_val
-	STA, product
-	JMP, top
+	STA x_val
+	LDA product
+	ADD y_val
+	STA product
+	JMP top
 
 
 

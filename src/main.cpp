@@ -13,6 +13,7 @@ int main()
 	std::string filename = "mult.asm";
 	//std::string filename = "inc+dec.asm";
 
+	//tokenizer::tokenize(filename);
 	assembler::assemble(filename, output);
 
 	return 0;
