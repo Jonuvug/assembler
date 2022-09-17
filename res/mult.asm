@@ -28,6 +28,3 @@ continue:
 	ADD y_val
 	STA product
 	JMP top
-
-
-

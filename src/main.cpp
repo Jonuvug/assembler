@@ -9,12 +9,13 @@
 int main()
 {
 	std::vector<unsigned char> output;
+	std::vector<assembler::Label> symbolTable;
 
 	std::string filename = "mult.asm";
 	//std::string filename = "inc+dec.asm";
 
-	//tokenizer::tokenize(filename);
-	assembler::assemble(filename, output);
+	assembler::firstPass(filename, symbolTable);
+	//assembler::assemble(filename, output);
 
 	return 0;
 }
