@@ -7,7 +7,7 @@ init:
 	LDI %01
 	STA one
 	LDI %16
-	STA x_val
+	STA $0051
 	LDI %09
 	STA y_val
 	LDI %00
