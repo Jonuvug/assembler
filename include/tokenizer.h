@@ -7,187 +7,14 @@
 #include <map>
 #include <fstream>
 
+#include "datatypes.h"
 #include "utils.h"
 
-const std::string TOKEN_PATH = "tokens.tkz";
+const std::string TOKEN_FNAME = "tokens.tkz";
 
 namespace tokenizer
 {
-	enum class TokenType
-	{
-		TK_SYMBOL,
-		TK_ADDRESS,
-		TK_LITERAL,
-
-		TK_PERCENT,
-		TK_DOLLAR,
-		TK_EQUAL,
-		TK_COLON,
-		TK_COMMA,
-		TK_NEWLINE
-	};
-
-	struct Token
-	{
-		TokenType type;
-		std::string value;
-
-		bool operator == (Token const& other)
-		{
-			return value == other.value && type == other.type;
-		}
-		bool operator != (Token const& other)
-		{
-			return !(*this==other);
-		}
-
-		friend std::ofstream& operator << (std::ofstream& os, const Token& tk)
-		{
-			switch (tk.type)
-			{
-			case TokenType::TK_SYMBOL:
-				os << '!';
-				os << tk.value;
-				os << '|';
-				break;
-			case TokenType::TK_ADDRESS:
-				os << tk.value;
-				os << '|';
-				break;
-			case TokenType::TK_LITERAL:
-				os << tk.value;
-				os << '|';
-				break;
-			case TokenType::TK_PERCENT:
-				os << '%';
-				break;
-			case TokenType::TK_DOLLAR:
-				os << '$';
-				break;
-			case TokenType::TK_EQUAL:
-				os << '=';
-				break;
-			case TokenType::TK_COLON:
-				os << ':';
-				break;
-			case TokenType::TK_COMMA:
-				os << ',';
-				break;
-			}
-
-			return os;
-		}
-	};
-
-	struct TokenGroup
-	{
-		std::vector<Token> tokens;
-		int line;
-
-		bool operator == (TokenGroup const& other)
-		{
-			if (tokens.size() != other.tokens.size())
-			{
-				return false;
-			}
-			for (int i = 0; i < tokens.size(); i++)
-			{
-				if (tokens[i] != other.tokens[i])
-				{
-					return false;
-				}
-			}
-			return true;
-		}
-
-		bool operator != (TokenGroup const& other)
-		{
-			return !(*this == other);
-		}
-
-		friend std::ofstream& operator << (std::ofstream& os, const TokenGroup& tg)
-		{
-			for (auto& token : tg.tokens)
-			{
-				os << token;
-			}
-			os << '/';
-			os << tg.line;
-			os << '\n';
-
-			return os;
-		}
-
-		friend std::ifstream& operator >> (std::ifstream& is, TokenGroup& tg)
-		{
-			std::vector<Token> tokens;
-			int line = 0;
-
-			char c;
-			TokenType type = TokenType::TK_SYMBOL;
-			std::string value;
-			std::string symbol;
-			bool eol = false;
-
-			while (!eol && !is.eof() && is >> c)
-			{
-				switch (c)
-				{
-				case '%':
-					// literal
-					type = TokenType::TK_LITERAL;
-					tokens.push_back({ TokenType::TK_PERCENT, "PERCENT(%)" });
-					break;
-				case '$':
-					// address
-					type = TokenType::TK_ADDRESS;
-					tokens.push_back({ TokenType::TK_DOLLAR, "DOLLAR($)" });
-					break;
-				case '=':
-					tokens.push_back({ TokenType::TK_EQUAL, "EQUAL(=)" });
-					break;
-				case ':':
-					tokens.push_back({ TokenType::TK_COLON, "COLON(:)" });
-					break;
-				case ',':
-					tokens.push_back({ TokenType::TK_COMMA, "COMMA(,)" });
-					break;
-
-				case '|':
-					// eof symbol
-					tokens.push_back({ type, symbol });
-					symbol.clear();
-					break;
-				case '!':
-					// symbol
-					type = TokenType::TK_SYMBOL;
-					break;
-
-				case '/':
-					// end of line
-					eol = true;
-
-					//get line number
-					value.clear();
-					while (is.get(c) && c != '\n')
-					{
-						value.push_back(c);
-					}
-					line = stoi(value);
-
-					tokens.push_back({ TokenType::TK_NEWLINE, "NEWLINE(\\n)" });
-					break;
-				default:
-					symbol.push_back(c);
-					break;
-				}
-			}
-			tg = { tokens, line };
-
-			return is;
-		}
-	};
-
+	
 	void validateTokens(TokenGroup& tokenGroup)
 	{
 
@@ -229,13 +56,13 @@ namespace tokenizer
 		}
 	}
 
-	void identifySymbol(std::string& currentString, TokenType& previousTokenType, TokenType& stringType, int currentLine)
+	void identifySymbol(std::string& currentSymbol, TokenType& previousTokenType, TokenType& stringType, int currentLine)
 	{
 		switch (previousTokenType)
 		{
 		case TokenType::TK_DOLLAR:
 			// is hex & of length 4
-			if (currentString.find_first_not_of("0123456789abcdefABCDEF") == std::string::npos && currentString.length() == 4)
+			if (currentSymbol.find_first_not_of("0123456789abcdefABCDEF") == std::string::npos && currentSymbol.length() == 4)
 			{
 				stringType = TokenType::TK_ADDRESS;
 				break;
@@ -244,7 +71,7 @@ namespace tokenizer
 			break;
 		case TokenType::TK_PERCENT:
 			// is hex & of length 2
-			if (currentString.find_first_not_of("0123456789abcdefABCDEF") == std::string::npos && currentString.length() == 2)
+			if (currentSymbol.find_first_not_of("0123456789abcdefABCDEF") == std::string::npos && currentSymbol.length() == 2)
 			{
 				stringType = TokenType::TK_LITERAL;
 				break;
@@ -274,42 +101,45 @@ namespace tokenizer
 		tokenGroup.tokens.push_back({ type, value });
 	}
 
-	void writeLine(std::ofstream& tokenFile, TokenGroup& tokenGroup, int& currentLine)
-	{
-		tokenGroup.line = currentLine;
+	//void writeLine(std::ofstream& tokenFile, TokenGroup& tokenGroup, int& currentLine)
+	//{
+	//	tokenGroup.line = currentLine;
 
-		// skip newlines
-		if (tokenGroup.tokens.size() > 1)
-		{
-			// validate and write onto tokenfile
-			validateTokens(tokenGroup);
-			tokenFile << tokenGroup;
-		}
+	//	// skip newlines
+	//	if (tokenGroup.tokens.size() > 1)
+	//	{
+	//		// validate and write onto tokenfile
+	//		validateTokens(tokenGroup);
+	//		tokenFile << tokenGroup;
 
-		currentLine++;
-		tokenGroup.tokens.clear();
-	}
+	//	}
+
+	//	currentLine++;
+	//	tokenGroup.tokens.clear();
+	//}
 
 	void tokenize(const std::string filename)
 	{
 		// load file
-		std::ifstream rawFile(utils::RES_PATH + filename);
+		/*std::ifstream rawFile(utils::RES_PATH + filename);
 		if (!rawFile.is_open())
 		{
 			utils::Error(utils::ErrorType::ER_LOADING_FILE, 0);
 			return;
-		}
+		}*/
 
 		int currentLine = 1;
-		std::string currentString = "";
+		std::string currentSymbol = "";
 		TokenType previousTokenType = TokenType::TK_SYMBOL;
 		TokenGroup tokenGroup;
 
 		//open intermediary file
-		std::ofstream tokenFile(utils::RES_PATH + TOKEN_PATH);
+		//std::ofstream tokenFile(utils::RES_PATH + TOKEN_FNAME);
+
+		utils::FileManager fm(filename, utils::FileMode::FM_RAW_TO_TOKEN);
 
 		char c;
-		while(rawFile.get(c))
+		while(fm.next(c))
 		{
 			switch (c)
 			{
@@ -318,29 +148,37 @@ namespace tokenizer
 				break;
 
 			case '%':
-				appendToken(tokenGroup, TokenType::TK_PERCENT, currentString, previousTokenType, currentLine, "PERCENT(%)");
+				appendToken(tokenGroup, TokenType::TK_PERCENT, currentSymbol, previousTokenType, currentLine, "PERCENT(%)");
 				break;
 
 			case '$':
-				appendToken(tokenGroup, TokenType::TK_DOLLAR, currentString, previousTokenType, currentLine, "DOLLAR($)");
+				appendToken(tokenGroup, TokenType::TK_DOLLAR, currentSymbol, previousTokenType, currentLine, "DOLLAR($)");
 				break;
 
 			case '=':
-				appendToken(tokenGroup, TokenType::TK_EQUAL, currentString, previousTokenType, currentLine, "EQUAL(=)");
+				appendToken(tokenGroup, TokenType::TK_EQUAL, currentSymbol, previousTokenType, currentLine, "EQUAL(=)");
 				break;
 
 			case ':':
-				appendToken(tokenGroup, TokenType::TK_COLON, currentString, previousTokenType, currentLine, "COLON(:)");
+				appendToken(tokenGroup, TokenType::TK_COLON, currentSymbol, previousTokenType, currentLine, "COLON(:)");
 				break;
 
 			case ',':
-				appendToken(tokenGroup, TokenType::TK_COMMA, currentString, previousTokenType, currentLine, "COMMA(,)");
+				appendToken(tokenGroup, TokenType::TK_COMMA, currentSymbol, previousTokenType, currentLine, "COMMA(,)");
 				break;
 
 			case '\n':
-				appendToken(tokenGroup, TokenType::TK_NEWLINE, currentString, previousTokenType, currentLine, "NEWLINE(\\n)");
+				appendToken(tokenGroup, TokenType::TK_NEWLINE, currentSymbol, previousTokenType, currentLine, "NEWLINE(\\n)");
 				
-				writeLine(tokenFile, tokenGroup, currentLine);
+				tokenGroup.line = currentLine;
+
+				validateTokens(tokenGroup);
+				
+				fm.write(tokenGroup);
+				currentLine++;
+
+				tokenGroup.clear();
+
 				break;
 
 			case 'a':
@@ -411,7 +249,7 @@ namespace tokenizer
 			case '7':
 			case '8':
 			case '9':
-				currentString.push_back(c);
+				currentSymbol.push_back(c);
 				break;
 
 			default:
@@ -419,10 +257,12 @@ namespace tokenizer
 				break;
 			}
 		}
-		appendToken(tokenGroup, TokenType::TK_NEWLINE, currentString, previousTokenType, currentLine, "NEWLINE(\\n)");
+		appendToken(tokenGroup, TokenType::TK_NEWLINE, currentSymbol, previousTokenType, currentLine, "NEWLINE(\\n)");
 
-		writeLine(tokenFile, tokenGroup, currentLine);
+		tokenGroup.line = currentLine;
 
-		tokenFile.close();
+		validateTokens(tokenGroup);
+
+		fm.write(tokenGroup);
 	}
 }

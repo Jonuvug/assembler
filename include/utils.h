@@ -2,6 +2,10 @@
 
 #include <unordered_map>
 #include <iostream>
+#include <fstream>
+
+//#include "tokenizer.h"
+
 
 namespace utils
 {
@@ -67,5 +71,143 @@ namespace utils
 
 		Error(ErrorType _type, int _line) : Error(_type, ErrorInfoMap[_type].fatal, _line)
 		{ }
+	};
+
+	enum class FileMode
+	{
+		FM_RAW_TO_TOKEN,
+		FM_TOKEN_TO_INTERMEDIATE,
+		FM_INTERMEDIATE_TO_OBJECT,
+	};
+
+	class FileManager
+	{
+	private:
+
+		const std::string INTERMEDIATE_FNAME = "intermediate.ime";
+		const std::string SYMBOLTABLE_FNAME = "symbolTable.sym";
+		const std::string OBJECT_FNAME = "output.out";
+		const std::string TOKEN_FNAME = "tokens.tkz";
+
+
+		std::ifstream input_stream;
+		std::ofstream output_stream;
+		FileMode fmode;
+
+		void compileToken(Token& token, std::string& output)
+		{
+			switch (token.type)
+			{
+			case TokenType::TK_SYMBOL:
+				output.push_back('!');
+
+				for each (char c in token.value)
+				{
+					output.push_back(c);
+				}
+
+				output.push_back('|');
+				break;
+			case TokenType::TK_ADDRESS:
+
+				for each (char c in token.value)
+				{
+					output.push_back(c);
+				}
+
+				output.push_back('|');
+				break;
+			case TokenType::TK_LITERAL:
+
+				for each (char c in token.value)
+				{
+					output.push_back(c);
+				}
+
+				output.push_back('|');
+				break;
+			case TokenType::TK_PERCENT:
+				output.push_back('%');
+				break;
+			case TokenType::TK_DOLLAR:
+				output.push_back('$');
+				break;
+			case TokenType::TK_EQUAL:
+				output.push_back('=');
+				break;
+			case TokenType::TK_COLON:
+				output.push_back(':');
+				break;
+			case TokenType::TK_COMMA:
+				output.push_back(',');
+				break;
+			}
+		}
+
+		void writeToken(TokenGroup& tokenGroup)
+		{
+			std::string output = "";
+			if (tokenGroup.tokens.size() > 1)
+			{
+				if (tokenGroup.tokens[0].type != TokenType::TK_NEWLINE) // skip newline
+				{
+					for (auto& token : tokenGroup.tokens)
+					{
+						compileToken(token, output);
+					}
+					output.push_back('/');
+					output.append(std::to_string(tokenGroup.line));
+					output.push_back('\n');
+
+					output_stream << output;
+				}
+			}
+		}
+
+	public:
+
+		std::istream& next(char& c)
+		{
+			return input_stream.get(c);
+		}
+
+		void write(TokenGroup& tk_group)
+		{
+			if (fmode != FileMode::FM_RAW_TO_TOKEN)
+			{
+				// TODO -	throw error : invalid file mode 
+				return;
+			}
+			writeToken(tk_group);
+		}
+
+		void close()
+		{
+			input_stream.close();
+			output_stream.close();
+		}
+
+		FileManager(const std::string& RAW_FNAME, FileMode transferMode) :
+			fmode(transferMode)
+		{
+			input_stream = std::ifstream(RES_PATH + RAW_FNAME);
+			if (!input_stream.is_open())
+			{
+				utils::Error(utils::ErrorType::ER_LOADING_FILE, 0);
+				return;
+			}
+
+			output_stream = std::ofstream(utils::RES_PATH + TOKEN_FNAME);
+			if (!output_stream.is_open())
+			{
+				utils::Error(utils::ErrorType::ER_LOADING_FILE, 0);
+				return;
+			}
+		}
+
+		~FileManager()
+		{
+			close();
+		}
 	};
 }

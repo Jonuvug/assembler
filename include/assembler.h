@@ -3,6 +3,7 @@
 #include <fstream>
 #include <unordered_map>
 
+#include "datatypes.h"
 #include "utils.h"
 #include "tokenizer.h"
 
@@ -12,73 +13,7 @@ namespace assembler
 	const std::string SYMBOLTABLE_PATH = "symbolTable.sym";
 	const std::string OBJECT_PATH = "output.out";
 
-	enum class OperandType
-	{
-		OT_ADDRESS,
-		OT_LITERAL,
-		OT_NONE,
-	};
 	
-	struct Label
-	{
-		tokenizer::Token token;
-		OperandType labelType;
-		int labelValue;
-
-		friend std::ofstream& operator << (std::ofstream& os, const Label& lb)
-		{
-			os << lb.token.value;
-			os << '|';
-			switch (lb.labelType)
-			{
-			case OperandType::OT_ADDRESS:
-				os << 0;
-				break;
-			case OperandType::OT_LITERAL:
-				os << 1;
-				break;
-			}
-			os << lb.labelValue;
-			os << '\n';
-
-			return os;
-		}
-
-		friend std::ifstream& operator >> (std::ifstream& is, Label& lb)
-		{
-			char c;
-			std::string value;
-
-			//get token
-			std::string tokenValue;
-			while (is >> c && c != '|')
-			{
-				tokenValue.push_back(c);
-			}
-			
-			//get label type
-			is >> c;
-			OperandType labelType = (c == '0') ? OperandType::OT_ADDRESS : OperandType::OT_LITERAL;
-
-			//get label value
-			while (is.get(c) && c != '\n')
-			{
-				value.push_back(c);
-			}
-			int labelValue = stoi(value);
-
-			lb = { {tokenizer::TokenType::TK_SYMBOL, tokenValue}, labelType, labelValue };
-			return is;
-		}
-	};
-
-	struct Operation
-	{
-		std::string mnemonic;
-		unsigned char opcode;
-		unsigned int wordSize;
-		OperandType operandType;
-	};
 
 	std::unordered_map<std::string, Operation> OpCodeTable =
 	{
@@ -98,96 +33,7 @@ namespace assembler
 	};
 
 
-	enum class RecordType
-	{
-		RT_DEF_ADDRESS,
-		RT_DEF_LITERAL,
-		RT_DEF_LABEL,
-
-		RT_INS_ADDRESS,
-		RT_INS_LITERAL,
-		RT_INS_LABEL,
-		RT_INS_NONE
-	};
-
-	struct Record
-	{
-		RecordType type;
-		tokenizer::TokenGroup tokenGroup;
-
-		friend std::ofstream& operator << (std::ofstream& os, const Record& rd)
-		{
-			switch (rd.type)
-			{
-			case RecordType::RT_DEF_ADDRESS:
-				os << 0;
-				break;
-			case RecordType::RT_DEF_LITERAL:
-				os << 1;
-				break;
-			case RecordType::RT_DEF_LABEL:
-				os << 2;
-				break;
-			case RecordType::RT_INS_ADDRESS:
-				os << 3;
-				break;
-			case RecordType::RT_INS_LITERAL:
-				os << 4;
-				break;
-			case RecordType::RT_INS_LABEL:
-				os << 5;
-				break;
-			case RecordType::RT_INS_NONE:
-				os << 6;
-				break;
-			}
-			os << rd.tokenGroup;
-
-			return os;
-		}
-
-		friend std::ifstream& operator >> (std::ifstream& is, Record& rd)
-		{
-			
-			RecordType type = RecordType::RT_DEF_ADDRESS;
-			tokenizer::TokenGroup tg;
-
-			char c;
-			//get record type 
-			is >> c;
-			switch (c)
-			{
-			case '0':
-				type = RecordType::RT_DEF_ADDRESS;
-				break;
-			case '1':
-				type = RecordType::RT_DEF_LITERAL;
-				break;
-			case '2':
-				type = RecordType::RT_DEF_LABEL;
-				break;
-			case '3':
-				type = RecordType::RT_INS_ADDRESS;
-				break;
-			case '4':
-				type = RecordType::RT_INS_LITERAL;
-				break;
-			case '5':
-				type = RecordType::RT_INS_LABEL;
-				break;
-			case '6':
-				type = RecordType::RT_INS_NONE;
-				break;
-			}
-
-			//get tokengroup
-			is >> tg;
-
-			rd = { type, tg };
-
-			return is;
-		}
-	};
+	
 
 
 	struct Intermediate
@@ -196,19 +42,19 @@ namespace assembler
 		std::vector<Label> symbolTable;
 	};
 
-	void findRecordType(tokenizer::TokenGroup& tokenGroup, assembler::RecordType& recordType)
+	void findRecordType(TokenGroup& tokenGroup, RecordType& recordType)
 	{
 		// variable definition
-		if (tokenGroup.tokens[1].type == tokenizer::TokenType::TK_EQUAL)
+		if (tokenGroup.tokens[1].type == TokenType::TK_EQUAL)
 		{
 			// define address variable
-			if (tokenGroup.tokens[3].type == tokenizer::TokenType::TK_ADDRESS)
+			if (tokenGroup.tokens[3].type == TokenType::TK_ADDRESS)
 			{
 				recordType = RecordType::RT_DEF_ADDRESS;
 				return;
 			}
 			// define literal variable
-			if (tokenGroup.tokens[3].type == tokenizer::TokenType::TK_LITERAL)
+			if (tokenGroup.tokens[3].type == TokenType::TK_LITERAL)
 			{
 				recordType = RecordType::RT_DEF_LITERAL;
 				return;
@@ -216,37 +62,37 @@ namespace assembler
 		}
 		
 		// define label
-		if (tokenGroup.tokens[1].type == tokenizer::TokenType::TK_COLON)
+		if (tokenGroup.tokens[1].type == TokenType::TK_COLON)
 		{
 			recordType = RecordType::RT_DEF_LABEL;
 			return;
 		}
 
 		// instruction no operand
-		if (tokenGroup.tokens[1].type == tokenizer::TokenType::TK_NEWLINE)
+		if (tokenGroup.tokens[1].type == TokenType::TK_NEWLINE)
 		{
 			recordType = RecordType::RT_INS_NONE;
 			return;
 		}
 
 		// instruction with operand
-		if (tokenGroup.tokens[1].type == tokenizer::TokenType::TK_COMMA)
+		if (tokenGroup.tokens[1].type == TokenType::TK_COMMA)
 		{
 			
 			// label as operand
-			if (tokenGroup.tokens[2].type == tokenizer::TokenType::TK_SYMBOL)
+			if (tokenGroup.tokens[2].type == TokenType::TK_SYMBOL)
 			{
 				recordType = RecordType::RT_INS_LABEL;
 				return;
 			}
 			// address as operand
-			if (tokenGroup.tokens[3].type == tokenizer::TokenType::TK_ADDRESS)
+			if (tokenGroup.tokens[3].type == TokenType::TK_ADDRESS)
 			{
 				recordType = RecordType::RT_INS_ADDRESS;
 				return;
 			}
 			// literal as operand
-			if (tokenGroup.tokens[3].type == tokenizer::TokenType::TK_LITERAL)
+			if (tokenGroup.tokens[3].type == TokenType::TK_LITERAL)
 			{
 				recordType = RecordType::RT_INS_LITERAL;
 				return;
@@ -256,7 +102,7 @@ namespace assembler
 		utils::Error( utils::ErrorType::ER_INVALID_TOKEN_ORDER, tokenGroup.line );
 	}
 
-	void appendLabel(std::vector<Label>& symbolTable, tokenizer::Token symbol, int labelValue, OperandType type, int line)
+	void appendLabel(std::vector<Label>& symbolTable, Token symbol, int labelValue, OperandType type, int line)
 	{
 		for (auto& label : symbolTable)
 		{
@@ -272,14 +118,14 @@ namespace assembler
 	{
 		int locationCounter = 0;
 
-		std::ifstream tokenFile(utils::RES_PATH + TOKEN_PATH);
+		std::ifstream tokenFile(utils::RES_PATH + "tokens.tkz");
 
 		std::ofstream intermediateFile(utils::RES_PATH + INTERMEDIATE_PATH);
 		std::ofstream symbolTableFile(utils::RES_PATH + SYMBOLTABLE_PATH);
 
 		std::vector<Label> symbolTable;
 
-		tokenizer::TokenGroup tokenGroup;
+		TokenGroup tokenGroup;
 
 		while (tokenFile >> tokenGroup)
 		{
